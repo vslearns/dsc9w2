@@ -1,0 +1,89 @@
+---
+title: American Colleges & Universities
+author: "Vanshaj S. • Aug. 3, 2018"
+output: 
+  prettydoc::html_pretty:
+    theme: hpstr
+    highlight: github
+---
+
+```{r, echo=F}
+knitr::opts_chunk$set(warning=F, message=F, error=F)
+```
+
+
+## Introduction
+In this project, we were challenged to present a unique interactive map using Leaflet in R. While the data I chose to map isn't exactly unique, I believe my approach satisfied the project requirements.
+
+The United States has a plethora of colleges and universities not only in the lower 48 states, but also in its international territories. As a high school senior, I find it interesting to examine the prevalence of colleges in different areas. Therefore, I decided to plot all of the colleges affiliated with the US by state/territory.
+
+## Getting and Processing Data
+The data was downloaded a bit unconventionally from Kaggle, but if you were to follow the proper steps, here's the download process.
+
+```{r, eval=F}
+system("kaggle datasets download -d noriuk/us-college-scorecard-data-19962015")
+unzip("us-college-scorecard-data-19962015.zip")
+```
+
+Let's now load the data and select the useful columns.
+
+```{r}
+data <- read.csv("Preview_MERGED2014_15_PP.csv")
+data <- subset(data, select = c("INSTNM", "CITY",
+                                "STABBR", "LATITUDE",
+                                "LONGITUDE", "INSTURL"))
+```
+
+The LATITUDE and LONGITUDE data is actually dirty in that it's presented as a factor, not a number. Let's fix that.
+
+```{r}
+data$LATITUDE <- as.numeric(as.character(data$LATITUDE))
+data$LONGITUDE <- as.numeric(as.character(data$LONGITUDE))
+
+data <- data[complete.cases(data),]
+```
+
+We're good to go.
+
+## Creating the Map
+My goal was to split up the universities by state, so we'll take a slightly different approach to creating the map.
+
+Let's load leaflet and create the base map.
+
+```{r}
+library(leaflet)
+map <- addTiles(leaflet())
+```
+
+Now we'll add our data **by state**. We'll also attach a hyperlink to each college so that we can visit its website quickly.
+
+```{r}
+for (st in unique(data$STABBR)) {
+  map <- map %>% addMarkers(data = data[data$STABBR == st,],
+                            lat = ~LATITUDE, lng = ~LONGITUDE,
+                            clusterOptions = markerClusterOptions(),
+                            label = ~INSTNM, group = st,
+                            
+                            popup = ~paste("<b><a href='http://", INSTURL,     # the university website
+                                           "' target='_blank'>", INSTNM,       # opens in a new page.
+                                           "</a></b><br />", CITY, ", ",       # the university city, st
+                                           STABBR, sep = ""))                  # shows below it.
+}
+```
+
+Finally, let's add a layers control so that we can choose to look at only the colleges we care about.
+
+```{r}
+map <- map %>% addLayersControl(
+  overlayGroups = sort(unique(data$STABBR)),
+  options = layersControlOptions(collapsed = FALSE)
+)
+```
+
+Here's the resulting map.
+
+```{r, echo=F, results='asis'}
+map
+```
+
+
